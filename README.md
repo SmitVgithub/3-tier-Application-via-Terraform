@@ -19,54 +19,66 @@ Before you begin, ensure you have the following:
 
 ## Getting Started
 ### Installation
-Clone this repository:
+1. Clone this repository:
+
 `bash`
 ```
 git clone <repository-url>
 cd 3-tier-Application-via-Terraform
 ```
-Initialize Terraform:
+2. Initialize Terraform:
 
-csharp
-Copy code
+`csharp`
+```
 terraform init
-Configuration
-Customize the deployment by modifying variables.tf to match your requirements.
+```
 
-Update backend.tf with your preferred backend configuration for state management.
+### Configuration
+1. Customize the deployment by modifying variables.tf to match your requirements.
 
-Deploying Infrastructure
+2. Update backend.tf with your preferred backend configuration for state management.
+
+## Deploying Infrastructure
 To deploy the infrastructure:
 
-Review the planned changes:
+1. Review the planned changes:
 
-Copy code
+```
 terraform plan
-Apply the changes:
+```
 
-Copy code
+2. Apply the changes:
+
+```
 terraform apply
-Confirm by typing yes when prompted.
+```
 
-Structure
-main.tf: Defines the main infrastructure components.
-variables.tf: Contains input variables for customization.
-networking.tf: Configures VPC, subnets, and networking components.
-frontend.tf: Configures the frontend application tier with EC2 instances and load balancing.
-backend.tf: Configures the backend application tier with EC2 instances and load balancing.
-database.tf: Configures the MongoDB database tier with EC2 instances.
-outputs.tf: Defines the output values to display after deployment.
-Resources
-EC2 Instances: Deployed for frontend, backend, and database tiers.
-Load Balancers: Ensures high availability and distributes traffic across instances.
-Security Groups: Controls inbound and outbound traffic to instances.
-VPC: Virtual Private Cloud for network isolation.
-Subnets: Segments network traffic and ensures availability zones coverage.
-Route Tables: Directs traffic between subnets and internet gateways.
-Variables
-vpc_name: Name for the VPC and related resources.
-region: AWS region to deploy resources.
-public_key_path: Path to the public key file for SSH access.
-frontend_instance_type: Instance type for the frontend EC2 instances.
-Contributing
+3. Confirm by typing **yes** when prompted.
+
+## Structure
+
+* **main.tf:** Defines the main infrastructure components.
+* **variables.tf:** Contains input variables for customization.
+* **networking.tf:** Configures VPC, subnets, and networking components.
+* **frontend.tf:** Configures the frontend application tier with EC2 instances and load balancing.
+* **backend.tf:** Configures the backend application tier with EC2 instances and load balancing.
+* **database.tf:** Configures the MongoDB database tier with EC2 instances.
+* **outputs.tf:** Defines the output values to display after deployment.
+
+## Resources
+
+* **EC2 Instances:** Deployed for frontend, backend, and database tiers.
+* **Load Balancers:** Ensures high availability and distributes traffic across instances.
+* **Security Groups:** Controls inbound and outbound traffic to instances.
+* **VPC:** Virtual Private Cloud for network isolation.
+* **Subnets:** Segments network traffic and ensures availability zones coverage.
+* **Route Tables:** Directs traffic between subnets and internet gateways.
+
+## Variables
+* **vpc_name:** Name for the VPC and related resources.
+* **region:** AWS region to deploy resources.
+* **public_key_path:** Path to the public key file for SSH access.
+* **frontend_instance_type:** Instance type for the frontend EC2 instances and same for backend and database.
+
+## Contributing
 Contributions are welcome! Fork this repository, make your changes, and submit a pull request.
