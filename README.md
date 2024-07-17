@@ -1,7 +1,7 @@
 # Terraform Infrastructure for 3-Tier Application
 This Terraform project sets up a 3-tier application architecture on AWS, consisting of a frontend (React), backend (Node.js), and MongoDB database.
 
-##Overview
+## Overview
 This Terraform configuration deploys the following AWS resources:
 
 * **Frontend:** EC2 instances running a React application with load balancing.
@@ -13,17 +13,18 @@ This Terraform configuration deploys the following AWS resources:
 ## Prerequisites
 Before you begin, ensure you have the following:
 
-Terraform CLI installed locally.
-AWS CLI configured with appropriate credentials and permissions.
-SSH key pair for accessing EC2 instances.
-Getting Started
-Installation
-Clone this repository:
+* **Terraform CLI installed locally.**
+* **AWS CLI configured with appropriate credentials and permissions.**
+* **SSH key pair for accessing EC2 instances.**
 
-bash
-Copy code
+## Getting Started
+### Installation
+Clone this repository:
+`bash`
+```
 git clone <repository-url>
 cd 3-tier-Application-via-Terraform
+```
 Initialize Terraform:
 
 csharp
