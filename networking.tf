@@ -1,162 +1,238 @@
+# Data source for available AZs
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+# Local values for dynamic configuration
+locals {
+  azs = length(var.availability_zones) > 0 ? var.availability_zones : slice(data.aws_availability_zones.available.names, 0, var.az_count)
+
+  public_subnets  = [for i, az in local.azs : cidrsubnet(var.vpc_cidr, 8, i)]
+  private_subnets = [for i, az in local.azs : cidrsubnet(var.vpc_cidr, 8, i + length(local.azs))]
+  db_subnets      = [for i, az in local.azs : cidrsubnet(var.vpc_cidr, 8, i + (2 * length(local.azs)))]
+}
+
+# VPC
 resource "aws_vpc" "main" {
-  cidr_block = "10.0.0.0/16"
-  tags = {
-    Name = var.vpc_name
-  }
+  cidr_block           = var.vpc_cidr
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  tags = merge(var.common_tags, {
+    Name = "${var.project_name}-vpc"
+  })
 }
 
-resource "aws_subnet" "public_a" {
+# Internet Gateway
+resource "aws_internet_gateway" "main" {
+  vpc_id = aws_vpc.main.id
+
+  tags = merge(var.common_tags, {
+    Name = "${var.project_name}-igw"
+  })
+}
+
+# Public Subnets
+resource "aws_subnet" "public_subnet" {
+  count                   = length(local.azs)
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.1.0/24"
-  availability_zone       = "ap-south-1a"
+  cidr_block              = local.public_subnets[count.index]
+  availability_zone       = local.azs[count.index]
   map_public_ip_on_launch = true
-  tags = {
-    Name = "${var.vpc_name}-public-subnet-a"
-  }
+
+  tags = merge(var.common_tags, {
+    Name = "${var.project_name}-public-subnet-${count.index + 1}"
+    Tier = "Public"
+  })
 }
 
-resource "aws_subnet" "public_b" {
+# Private Subnets (for application tier)
+resource "aws_subnet" "private_subnet" {
+  count                   = length(local.azs)
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.2.0/24"
-  availability_zone       = "ap-south-1b"
-  map_public_ip_on_launch = true
-  tags = {
-    Name = "${var.vpc_name}-public-subnet-b"
-  }
+  cidr_block              = local.private_subnets[count.index]
+  availability_zone       = local.azs[count.index]
+  map_public_ip_on_launch = false
+
+  tags = merge(var.common_tags, {
+    Name = "${var.project_name}-private-subnet-${count.index + 1}"
+    Tier = "Private"
+  })
 }
 
-resource "aws_security_group" "all_in_one_sg" {
-  vpc_id = aws_vpc.main.id
-  tags = {
-    Name = "${var.vpc_name}-all-in-one-sg"
-  }
+# Database Subnets
+resource "aws_subnet" "db_subnet" {
+  count                   = length(local.azs)
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = local.db_subnets[count.index]
+  availability_zone       = local.azs[count.index]
+  map_public_ip_on_launch = false
 
-  # Ingress rules for all instances
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 3000
-    to_port     = 3000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 27017
-    to_port     = 27017
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Egress rule allows all traffic
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  tags = merge(var.common_tags, {
+    Name = "${var.project_name}-db-subnet-${count.index + 1}"
+    Tier = "Database"
+  })
 }
 
-resource "aws_security_group" "frontend_lb_sg" {
-  vpc_id = aws_vpc.main.id
-  tags = {
-    Name = "${var.vpc_name}-frontend-lb-sg"
-  }
+# Elastic IP for NAT Gateway
+resource "aws_eip" "nat" {
+  count  = var.enable_nat_gateway ? 1 : 0
+  domain = "vpc"
 
-  # Ingress rule for HTTP traffic
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  tags = merge(var.common_tags, {
+    Name = "${var.project_name}-nat-eip"
+  })
 
-  # Egress rule allows all traffic
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  depends_on = [aws_internet_gateway.main]
 }
 
-resource "aws_security_group" "backend_lb_sg" {
-  vpc_id = aws_vpc.main.id
-  tags = {
-    Name = "${var.vpc_name}-backend-lb-sg"
-  }
+# NAT Gateway
+resource "aws_nat_gateway" "main" {
+  count         = var.enable_nat_gateway ? 1 : 0
+  allocation_id = aws_eip.nat[0].id
+  subnet_id     = aws_subnet.public_subnet[0].id
 
-  # Ingress rule for HTTP traffic
-  ingress {
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  tags = merge(var.common_tags, {
+    Name = "${var.project_name}-nat-gw"
+  })
 
-  # Egress rule allows all traffic
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  depends_on = [aws_internet_gateway.main]
 }
 
-resource "aws_key_pair" "my_keypair" {
-  key_name   = "${var.vpc_name}-keypair"
-  public_key = file("mykey.pub")
-}
-
-resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.main.id
-
-  tags = {
-    Name = "${var.vpc_name}-igw"
-  }
-}
-
+# Public Route Table
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
-  tags = {
-    Name = "${var.vpc_name}-public-route-table"
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main.id
   }
+
+  tags = merge(var.common_tags, {
+    Name = "${var.project_name}-public-rt"
+  })
 }
 
-resource "aws_route" "route_to_igw" {
-  route_table_id            = aws_route_table.public.id
-  destination_cidr_block    = "0.0.0.0/0"
-  gateway_id                = aws_internet_gateway.igw.id
+# Private Route Table
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+
+  dynamic "route" {
+    for_each = var.enable_nat_gateway ? [1] : []
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.main[0].id
+    }
+  }
+
+  tags = merge(var.common_tags, {
+    Name = "${var.project_name}-private-rt"
+  })
 }
 
-resource "aws_route_table_association" "public_a" {
-  subnet_id      = aws_subnet.public_a.id
+# Public Subnet Route Table Associations
+resource "aws_route_table_association" "public" {
+  count          = length(local.azs)
+  subnet_id      = aws_subnet.public_subnet[count.index].id
   route_table_id = aws_route_table.public.id
 }
 
-resource "aws_route_table_association" "public_b" {
-  subnet_id      = aws_subnet.public_b.id
-  route_table_id = aws_route_table.public.id
+# Private Subnet Route Table Associations
+resource "aws_route_table_association" "private" {
+  count          = length(local.azs)
+  subnet_id      = aws_subnet.private_subnet[count.index].id
+  route_table_id = aws_route_table.private.id
 }
 
+# Database Subnet Route Table Associations
+resource "aws_route_table_association" "db" {
+  count          = length(local.azs)
+  subnet_id      = aws_subnet.db_subnet[count.index].id
+  route_table_id = aws_route_table.private.id
+}
 
+# ALB Security Group
+resource "aws_security_group" "alb_sg" {
+  name        = "${var.project_name}-alb-sg"
+  description = "Security group for frontend ALB"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description = "HTTP from anywhere"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTPS from anywhere"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(var.common_tags, {
+    Name = "${var.project_name}-alb-sg"
+  })
+}
+
+# Backend ALB Security Group
+resource "aws_security_group" "backend_alb_sg" {
+  name        = "${var.project_name}-backend-alb-sg"
+  description = "Security group for backend ALB"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description     = "HTTP from frontend"
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.frontend_sg.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(var.common_tags, {
+    Name = "${var.project_name}-backend-alb-sg"
+  })
+}
+
+# Frontend Security Group
+resource "aws_security_group" "frontend_sg" {
+  name        = "${var.project_name}-frontend-sg"
+  description = "Security group for frontend instances"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description     = "HTTP from ALB"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(var.common_tags, {
+    Name = "${var.project_name}-frontend-sg"
+  })
+}
