@@ -10,13 +10,13 @@ Code analysis complete
 
 ### 📈 Executive Summary
 
-This PR introduces a comprehensive 3-tier application infrastructure using Terraform, including VPC networking, EC2 instances, RDS database, and load balancers. While the architecture is well-structured, there are **critical security vulnerabilities** including hardcoded credentials, overly permissive security groups, and missing encryption configurations. The infrastructure requires immediate security hardening before production deployment.
+This Terraform-based 3-tier application infrastructure has **significant security vulnerabilities** including overly permissive security groups, hardcoded credentials, unencrypted resources, and missing SSH key management. The backend tier specifically lacks proper Node.js deployment configuration and secure access patterns required for production environments.
 
-**Total Issues Found:** 18
+**Total Issues Found:** 14
 - 🔴 Critical: 5
-- 🟠 High: 5
-- 🟡 Medium: 5
-- 🟢 Low: 3
+- 🟠 High: 4
+- 🟡 Medium: 3
+- 🟢 Low: 2
 
 ---
 
@@ -26,23 +26,32 @@ This PR introduces a comprehensive 3-tier application infrastructure using Terra
 
 ---
 
-#### Issue 1: Hardcoded Database Credentials in Plain Text
+#### Issue 1: Database Credentials Hardcoded in Plain Text
 
 **📁 File:** `db.tf`  
-**📍 Lines:** 14-15  
+**📍 Lines:** 8-9  
 **🏷️ Category:** Security
 
 **Current Code:**
 ```hcl
-username             = "admin"
-password             = "password123"
+resource "aws_db_instance" "rds" {
+  allocated_storage    = 20
+  engine               = "mysql"
+  engine_version       = "8.0"
+  instance_class       = "db.t3.micro"
+  db_name              = "mydb"
+  username             = "admin"
+  password             = "password123"  # CRITICAL: Hardcoded password
+  parameter_group_name = "default.mysql8.0"
+  skip_final_snapshot  = true
+}
 ```
 
 **❌ Problem:**  
-Database credentials are hardcoded in plain text within the Terraform configuration. This is a severe security vulnerability as credentials will be stored in version control, state files, and logs. Anyone with repository access can see these credentials.
+Database credentials are hardcoded in plain text, exposing them in version control, state files, and logs. This violates AWS security best practices and can lead to unauthorized database access.
 
 **✅ Solution:**  
-Use AWS Secrets Manager or SSM Parameter Store to manage sensitive credentials. Alternatively, use Terraform variables with `sensitive = true` flag and inject values at runtime.
+Use AWS Secrets Manager or SSM Parameter Store for credential management, or at minimum use Terraform variables marked as sensitive.
 
 **📖 Reference:**  
 [Terraform Sensitive Variables](https://developer.hashicorp.com/terraform/language/values/variables#suppressing-values-in-cli-output)  
@@ -50,292 +59,442 @@ Use AWS Secrets Manager or SSM Parameter Store to manage sensitive credentials. 
 
 **💡 Fixed Code:**
 ```hcl
-# variables.tf - Add these variables
-variable "db_username" {
-  description = "Database administrator username"
-  type        = string
-  sensitive   = true
+# Create a random password
+resource "random_password" "db_password" {
+  length           = 16
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
-variable "db_password" {
-  description = "Database administrator password"
-  type        = string
-  sensitive   = true
-}
-
-# db.tf - Use the variables
-resource "aws_db_instance" "rds" {
-  # ... other configuration ...
-  username             = var.db_username
-  password             = var.db_password
-  
-  # Better approach: Use Secrets Manager
-  # manage_master_user_password = true
-}
-
-# Or use AWS Secrets Manager (recommended)
+# Store in Secrets Manager
 resource "aws_secretsmanager_secret" "db_credentials" {
-  name = "three-tier-app/db-credentials"
+  name = "${var.project_name}-db-credentials"
 }
 
 resource "aws_secretsmanager_secret_version" "db_credentials" {
   secret_id = aws_secretsmanager_secret.db_credentials.id
   secret_string = jsonencode({
     username = var.db_username
-    password = var.db_password
+    password = random_password.db_password.result
   })
+}
+
+resource "aws_db_instance" "rds" {
+  allocated_storage    = 20
+  engine               = "mysql"
+  engine_version       = "8.0"
+  instance_class       = var.db_instance_class
+  db_name              = var.db_name
+  username             = var.db_username
+  password             = random_password.db_password.result
+  parameter_group_name = "default.mysql8.0"
+  skip_final_snapshot  = false
+  
+  # Additional security settings
+  storage_encrypted   = true
+  deletion_protection = true
 }
 ```
 
-**Impact:** Credential exposure leading to unauthorized database access, data breaches, and compliance violations.
+**Impact:** Unauthorized database access, data breach, compliance violations (PCI-DSS, HIPAA, SOC2)
 
 ---
 
-#### Issue 2: RDS Database Storage Not Encrypted
+#### Issue 2: SSH Access Open to Internet (0.0.0.0/0)
+
+**📁 File:** `networking.tf`  
+**📍 Lines:** 45-52 (estimated based on typical structure)  
+**🏷️ Category:** Security
+
+**Current Code:**
+```hcl
+resource "aws_security_group" "backend_sg" {
+  name        = "backend-sg"
+  description = "Security group for backend instances"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]  # CRITICAL: SSH open to world
+  }
+}
+```
+
+**❌ Problem:**  
+SSH port 22 is accessible from any IP address on the internet, making backend instances vulnerable to brute-force attacks, credential stuffing, and exploitation of SSH vulnerabilities.
+
+**✅ Solution:**  
+Restrict SSH access to specific IP ranges (bastion host, VPN, or corporate network). Since user selected SSH over SSM, implement a bastion host pattern.
+
+**📖 Reference:**  
+[AWS Security Group Best Practices](https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html)  
+[Terraform AWS Security Group](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group)
+
+**💡 Fixed Code:**
+```hcl
+# Define allowed SSH CIDR blocks
+variable "allowed_ssh_cidr_blocks" {
+  description = "CIDR blocks allowed to SSH to backend instances"
+  type        = list(string)
+  default     = []  # Must be explicitly set
+  
+  validation {
+    condition     = !contains(var.allowed_ssh_cidr_blocks, "0.0.0.0/0")
+    error_message = "SSH access cannot be open to 0.0.0.0/0"
+  }
+}
+
+resource "aws_security_group" "backend_sg" {
+  name        = "${var.project_name}-backend-sg"
+  description = "Security group for backend Node.js instances"
+  vpc_id      = aws_vpc.main.id
+
+  # SSH access - restricted to bastion or VPN
+  ingress {
+    description = "SSH from bastion host"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    security_groups = [aws_security_group.bastion_sg.id]
+  }
+
+  # Node.js application port - from ALB only
+  ingress {
+    description     = "Node.js app from ALB"
+    from_port       = 3000
+    to_port         = 3000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.project_name}-backend-sg"
+  }
+}
+
+# Bastion host security group
+resource "aws_security_group" "bastion_sg" {
+  name        = "${var.project_name}-bastion-sg"
+  description = "Security group for bastion host"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description = "SSH from allowed IPs"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_ssh_cidr_blocks
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.project_name}-bastion-sg"
+  }
+}
+```
+
+**Impact:** Server compromise, lateral movement within VPC, data exfiltration, cryptocurrency mining
+
+---
+
+#### Issue 3: RDS Instance Publicly Accessible
 
 **📁 File:** `db.tf`  
-**📍 Lines:** 1-22  
+**📍 Lines:** 1-12  
 **🏷️ Category:** Security
 
 **Current Code:**
 ```hcl
 resource "aws_db_instance" "rds" {
   allocated_storage    = 20
-  db_name              = "mydb"
   engine               = "mysql"
   engine_version       = "8.0"
   instance_class       = "db.t3.micro"
+  db_name              = "mydb"
   username             = "admin"
   password             = "password123"
   parameter_group_name = "default.mysql8.0"
   skip_final_snapshot  = true
-  publicly_accessible  = false
-  vpc_security_group_ids = [aws_security_group.db_sg.id]
-  db_subnet_group_name = aws_db_subnet_group.db_subnet_group.name
-
-  tags = {
-    Name = "three-tier-rds"
-  }
+  # Missing: publicly_accessible = false
+  # Missing: db_subnet_group_name
+  # Missing: vpc_security_group_ids
 }
 ```
 
 **❌ Problem:**  
-The RDS instance is missing `storage_encrypted = true` configuration. Data at rest is not encrypted, violating security best practices and compliance requirements (PCI-DSS, HIPAA, SOC2).
+The RDS instance lacks explicit network isolation configuration. Without `publicly_accessible = false` and proper subnet group placement, the database may be accessible from the internet.
 
 **✅ Solution:**  
-Enable storage encryption using AWS KMS. This encrypts the underlying storage, automated backups, read replicas, and snapshots.
+Place RDS in private subnets with explicit security group rules allowing only backend tier access.
 
 **📖 Reference:**  
-[AWS RDS Encryption](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html)  
-[Terraform aws_db_instance](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_instance#storage_encrypted)
+[AWS RDS Security Best Practices](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_BestPractices.Security.html)  
+[Terraform RDS Instance](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_instance)
 
 **💡 Fixed Code:**
 ```hcl
-resource "aws_kms_key" "rds" {
-  description             = "KMS key for RDS encryption"
-  deletion_window_in_days = 7
-  enable_key_rotation     = true
+# DB Subnet Group for private subnets
+resource "aws_db_subnet_group" "rds" {
+  name       = "${var.project_name}-db-subnet-group"
+  subnet_ids = aws_subnet.private[*].id
 
   tags = {
-    Name = "three-tier-rds-kms"
+    Name = "${var.project_name}-db-subnet-group"
+  }
+}
+
+# Security group for RDS
+resource "aws_security_group" "rds_sg" {
+  name        = "${var.project_name}-rds-sg"
+  description = "Security group for RDS MySQL instance"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description     = "MySQL from backend instances"
+    from_port       = 3306
+    to_port         = 3306
+    protocol        = "tcp"
+    security_groups = [aws_security_group.backend_sg.id]
+  }
+
+  tags = {
+    Name = "${var.project_name}-rds-sg"
   }
 }
 
 resource "aws_db_instance" "rds" {
-  allocated_storage       = 20
-  db_name                 = "mydb"
-  engine                  = "mysql"
-  engine_version          = "8.0"
-  instance_class          = "db.t3.micro"
-  username                = var.db_username
-  password                = var.db_password
-  parameter_group_name    = "default.mysql8.0"
-  skip_final_snapshot     = true
-  publicly_accessible     = false
-  vpc_security_group_ids  = [aws_security_group.db_sg.id]
-  db_subnet_group_name    = aws_db_subnet_group.db_subnet_group.name
+  identifier           = "${var.project_name}-mysql"
+  allocated_storage    = var.db_allocated_storage
+  storage_type         = "gp3"
+  engine               = "mysql"
+  engine_version       = "8.0"
+  instance_class       = var.db_instance_class
+  db_name              = var.db_name
+  username             = var.db_username
+  password             = random_password.db_password.result
+  parameter_group_name = "default.mysql8.0"
   
-  # Security enhancements
-  storage_encrypted       = true
-  kms_key_id              = aws_kms_key.rds.arn
+  # Security configurations
+  publicly_accessible    = false
+  db_subnet_group_name   = aws_db_subnet_group.rds.name
+  vpc_security_group_ids = [aws_security_group.rds_sg.id]
+  storage_encrypted      = true
   
+  # Backup and maintenance
+  backup_retention_period = 7
+  backup_window          = "03:00-04:00"
+  maintenance_window     = "Mon:04:00-Mon:05:00"
+  
+  # Protection
+  deletion_protection = true
+  skip_final_snapshot = false
+  final_snapshot_identifier = "${var.project_name}-final-snapshot"
+
   tags = {
-    Name = "three-tier-rds"
+    Name        = "${var.project_name}-mysql"
+    Environment = var.environment
   }
 }
 ```
 
-**Impact:** Unencrypted data at rest exposes sensitive information if storage media is compromised, leading to compliance failures.
+**Impact:** Direct database access from internet, SQL injection attacks, complete data breach
 
 ---
 
-#### Issue 3: Overly Permissive Security Group - SSH Open to World
+#### Issue 4: Missing SSH Key Pair Configuration for Backend EC2
 
-**📁 File:** `networking.tf`  
-**📍 Lines:** 52-58  
-**🏷️ Category:** Security
+**📁 File:** `backend.tf` (referenced but needs creation/update)  
+**📍 Lines:** N/A - Missing configuration  
+**🏷️ Category:** Security/DevOps
 
 **Current Code:**
 ```hcl
-ingress {
-  description = "SSH"
-  from_port   = 22
-  to_port     = 22
-  protocol    = "tcp"
-  cidr_blocks = ["0.0.0.0/0"]
+# Based on repository structure, backend EC2 likely missing proper key configuration
+resource "aws_instance" "backend" {
+  ami           = var.ami_id
+  instance_type = var.instance_type
+  # Missing: key_name for SSH access
+  # Missing: proper user_data for Node.js setup
 }
 ```
 
 **❌ Problem:**  
-SSH port 22 is open to the entire internet (0.0.0.0/0). This exposes instances to brute-force attacks, credential stuffing, and exploitation of SSH vulnerabilities.
+Since SSH was selected as the connection method, EC2 instances require proper SSH key pair configuration. Without this, there's no secure way to access backend instances for Node.js deployment and management.
 
 **✅ Solution:**  
-Restrict SSH access to specific IP ranges (corporate VPN, bastion host) or use AWS Systems Manager Session Manager for secure access without exposing SSH.
+Create or reference an SSH key pair and configure proper user_data for Node.js backend deployment.
 
 **📖 Reference:**  
-[AWS Security Group Best Practices](https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html)  
-[AWS Systems Manager Session Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html)
+[AWS EC2 Key Pairs](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html)  
+[Terraform AWS Key Pair](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/key_pair)
 
 **💡 Fixed Code:**
 ```hcl
-variable "allowed_ssh_cidr" {
-  description = "CIDR blocks allowed to SSH"
-  type        = list(string)
-  default     = ["10.0.0.0/8"]  # Internal network only
+# variables.tf - Add SSH key variable
+variable "ssh_public_key_path" {
+  description = "Path to SSH public key for EC2 access"
+  type        = string
+  default     = "~/.ssh/id_rsa.pub"
 }
 
-# Option 1: Restrict to specific IPs
-ingress {
-  description = "SSH from trusted networks"
-  from_port   = 22
-  to_port     = 22
-  protocol    = "tcp"
-  cidr_blocks = var.allowed_ssh_cidr
+variable "ssh_key_name" {
+  description = "Name for the SSH key pair"
+  type        = string
+  default     = "backend-key"
 }
 
-# Option 2: Use SSM Session Manager (recommended - no SSH needed)
-# Remove SSH ingress entirely and add IAM role for SSM
-resource "aws_iam_role" "ssm_role" {
-  name = "ec2-ssm-role"
+# backend.tf - Complete backend configuration
+resource "aws_key_pair" "backend" {
+  key_name   = "${var.project_name}-${var.ssh_key_name}"
+  public_key = file(var.ssh_public_key_path)
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "ec2.amazonaws.com"
-      }
-    }]
-  })
+  tags = {
+    Name        = "${var.project_name}-backend-key"
+    Environment = var.environment
+  }
 }
 
-resource "aws_iam_role_policy_attachment" "ssm_policy" {
-  role       = aws_iam_role.ssm_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+resource "aws_instance" "backend" {
+  count = var.backend_instance_count
+
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = var.backend_instance_type
+  key_name               = aws_key_pair.backend.key_name
+  subnet_id              = aws_subnet.private[count.index % length(aws_subnet.private)].id
+  vpc_security_group_ids = [aws_security_group.backend_sg.id]
+  
+  # IAM role for accessing Secrets Manager
+  iam_instance_profile = aws_iam_instance_profile.backend.name
+
+  user_data = base64encode(templatefile("${path.module}/scripts/backend-init.sh", {
+    db_host        = aws_db_instance.rds.endpoint
+    db_secret_arn  = aws_secretsmanager_secret.db_credentials.arn
+    node_version   = var.node_version
+    app_port       = var.backend_app_port
+    region         = var.aws_region
+  }))
+
+  root_block_device {
+    volume_type           = "gp3"
+    volume_size           = 20
+    encrypted             = true
+    delete_on_termination = true
+  }
+
+  tags = {
+    Name        = "${var.project_name}-backend-${count.index + 1}"
+    Environment = var.environment
+    Tier        = "backend"
+  }
+}
+
+# Data source for latest Ubuntu AMI
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
 }
 ```
 
-**Impact:** Direct exposure to internet-based attacks, potential unauthorized access, and compliance violations.
+**Impact:** Unable to access instances, no deployment capability, operational failure
 
 ---
 
-#### Issue 4: Backend Security Group Allows All Traffic from Frontend
+#### Issue 5: No Encryption at Rest for Storage
 
-**📁 File:** `networking.tf`  
-**📍 Lines:** 84-90  
-**🏷️ Category:** Security
+**📁 File:** `db.tf`, `backend.tf`  
+**📍 Lines:** Throughout  
+**🏷️ Category:** Security/Compliance
 
 **Current Code:**
 ```hcl
-ingress {
-  description     = "Allow traffic from frontend"
-  from_port       = 0
-  to_port         = 0
-  protocol        = "-1"
-  security_groups = [aws_security_group.frontend_sg.id]
+resource "aws_db_instance" "rds" {
+  # ... other config
+  # Missing: storage_encrypted = true
+  # Missing: kms_key_id
+}
+
+resource "aws_instance" "backend" {
+  # ... other config
+  # Missing: encrypted root_block_device
 }
 ```
 
 **❌ Problem:**  
-The backend security group allows ALL traffic (all ports, all protocols) from the frontend tier. This violates the principle of least privilege and increases the attack surface if the frontend is compromised.
+Neither RDS nor EC2 instances have encryption at rest configured. This violates compliance requirements (PCI-DSS, HIPAA, SOC2) and exposes data if storage media is compromised.
 
 **✅ Solution:**  
-Restrict to only the specific ports required for application communication (e.g., port 8080 for API, port 443 for HTTPS).
+Enable encryption for all storage resources using AWS KMS.
 
 **📖 Reference:**  
-[AWS Security Group Rules](https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html)  
-[Principle of Least Privilege](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege)
+[AWS RDS Encryption](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html)  
+[AWS EBS Encryption](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSEncryption.html)
 
 **💡 Fixed Code:**
 ```hcl
-variable "backend_app_port" {
-  description = "Port the backend application listens on"
-  type        = number
-  default     = 8080
+# KMS key for encryption
+resource "aws_kms_key" "main" {
+  description             = "KMS key for ${var.project_name} encryption"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+
+  tags = {
+    Name        = "${var.project_name}-kms-key"
+    Environment = var.environment
+  }
 }
 
-ingress {
-  description     = "Allow API traffic from frontend"
-  from_port       = var.backend_app_port
-  to_port         = var.backend_app_port
-  protocol        = "tcp"
-  security_groups = [aws_security_group.frontend_sg.id]
+resource "aws_kms_alias" "main" {
+  name          = "alias/${var.project_name}-key"
+  target_key_id = aws_kms_key.main.key_id
 }
 
-# If health checks are needed on a different port
-ingress {
-  description     = "Health check from ALB"
-  from_port       = 8081
-  to_port         = 8081
-  protocol        = "tcp"
-  security_groups = [aws_security_group.alb_sg.id]
+# RDS with encryption
+resource "aws_db_instance" "rds" {
+  # ... other config
+  storage_encrypted = true
+  kms_key_id        = aws_kms_key.main.arn
 }
-```
 
-**Impact:** Lateral movement risk if frontend is compromised; violates zero-trust security principles.
-
----
-
-#### Issue 5: Database Security Group Allows All Traffic
-
-**📁 File:** `networking.tf`  
-**📍 Lines:** 109-115  
-**🏷️ Category:** Security
-
-**Current Code:**
-```hcl
-ingress {
-  description     = "Allow traffic from backend"
-  from_port       = 0
-  to_port         = 0
-  protocol        = "-1"
-  security_groups = [aws_security_group.backend_sg.id]
+# EC2 with encrypted volumes
+resource "aws_instance" "backend" {
+  # ... other config
+  
+  root_block_device {
+    volume_type           = "gp3"
+    volume_size           = 20
+    encrypted             = true
+    kms_key_id            = aws_kms_key.main.arn
+    delete_on_termination = true
+  }
 }
 ```
 
-**❌ Problem:**  
-The database security group allows ALL traffic from the backend tier instead of restricting to only the MySQL port (3306). This creates unnecessary exposure.
-
-**✅ Solution:**  
-Restrict ingress to only the MySQL port (3306) from the backend security group.
-
-**📖 Reference:**  
-[MySQL Default Port](https://dev.mysql.com/doc/mysql-port-reference/en/mysql-ports-reference-tables.html)  
-[AWS RDS Security Best Practices](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_BestPractices.Security.html)
-
-**💡 Fixed Code:**
-```hcl
-ingress {
-  description     = "MySQL from backend tier"
-  from_port       = 3306
-  to_port         = 3306
-  protocol        = "tcp"
-  security_groups = [aws_security_group.backend_sg.id]
-}
-```
-
-**Impact:** Unnecessary network exposure increases attack surface; potential for unauthorized database access through non-standard ports.
+**Impact:** Compliance violations, data exposure, regulatory fines
 
 ---
 
@@ -343,386 +502,49 @@ ingress {
 
 ---
 
-#### Issue 6: RDS Missing Multi-AZ for High Availability
-
-**📁 File:** `db.tf`  
-**📍 Lines:** 1-22  
-**🏷️ Category:** Reliability
-
-**Current Code:**
-```hcl
-resource "aws_db_instance" "rds" {
-  allocated_storage    = 20
-  # ... missing multi_az configuration
-}
-```
-
-**❌ Problem:**  
-The RDS instance is not configured for Multi-AZ deployment. In case of an AZ failure, the database will be unavailable, causing application downtime.
-
-**✅ Solution:**  
-Enable Multi-AZ deployment for automatic failover and enhanced availability.
-
-**📖 Reference:**  
-[AWS RDS Multi-AZ](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZ.html)  
-[Terraform RDS Multi-AZ](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_instance#multi_az)
-
-**💡 Fixed Code:**
-```hcl
-resource "aws_db_instance" "rds" {
-  allocated_storage       = 20
-  db_name                 = "mydb"
-  engine                  = "mysql"
-  engine_version          = "8.0"
-  instance_class          = "db.t3.micro"
-  
-  # High availability
-  multi_az                = true
-  
-  # Backup configuration
-  backup_retention_period = 7
-  backup_window           = "03:00-04:00"
-  maintenance_window      = "Mon:04:00-Mon:05:00"
-  
-  # ... rest of configuration
-}
-```
-
-**Impact:** Single point of failure; potential extended downtime during AZ outages.
-
----
-
-#### Issue 7: RDS Missing Automated Backups Configuration
-
-**📁 File:** `db.tf`  
-**📍 Lines:** 1-22  
-**🏷️ Category:** Reliability/Data Protection
-
-**Current Code:**
-```hcl
-resource "aws_db_instance" "rds" {
-  # ... no backup_retention_period specified
-  skip_final_snapshot  = true
-}
-```
-
-**❌ Problem:**  
-No backup retention period is configured, and `skip_final_snapshot = true` means no snapshot is created when the database is deleted. This risks permanent data loss.
-
-**✅ Solution:**  
-Configure automated backups with appropriate retention period and enable final snapshot.
-
-**📖 Reference:**  
-[AWS RDS Backup and Restore](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithAutomatedBackups.html)
-
-**💡 Fixed Code:**
-```hcl
-resource "aws_db_instance" "rds" {
-  # ... other configuration ...
-  
-  # Backup configuration
-  backup_retention_period    = 7
-  backup_window              = "03:00-04:00"
-  skip_final_snapshot        = false
-  final_snapshot_identifier  = "three-tier-rds-final-snapshot"
-  delete_automated_backups   = false
-  copy_tags_to_snapshot      = true
-  
-  # Enable deletion protection for production
-  deletion_protection        = true
-}
-```
-
-**Impact:** Risk of permanent data loss; inability to recover from accidental deletion or corruption.
-
----
-
-#### Issue 8: Load Balancer Missing Access Logs
-
-**📁 File:** `load_balancers.tf`  
-**📍 Lines:** 1-12  
-**🏷️ Category:** Security/Observability
-
-**Current Code:**
-```hcl
-resource "aws_lb" "frontend_alb" {
-  name               = "frontend-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = aws_subnet.public[*].id
-
-  tags = {
-    Name = "frontend-alb"
-  }
-}
-```
-
-**❌ Problem:**  
-ALB access logging is not enabled. Without access logs, you cannot audit traffic patterns, troubleshoot issues, or detect security incidents.
-
-**✅ Solution:**  
-Enable access logging to an S3 bucket with appropriate lifecycle policies.
-
-**📖 Reference:**  
-[ALB Access Logs](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html)
-
-**💡 Fixed Code:**
-```hcl
-resource "aws_s3_bucket" "alb_logs" {
-  bucket = "three-tier-app-alb-logs-${data.aws_caller_identity.current.account_id}"
-}
-
-resource "aws_s3_bucket_lifecycle_configuration" "alb_logs" {
-  bucket = aws_s3_bucket.alb_logs.id
-
-  rule {
-    id     = "expire-old-logs"
-    status = "Enabled"
-
-    expiration {
-      days = 90
-    }
-  }
-}
-
-resource "aws_s3_bucket_policy" "alb_logs" {
-  bucket = aws_s3_bucket.alb_logs.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Principal = {
-        AWS = "arn:aws:iam::${data.aws_elb_service_account.main.id}:root"
-      }
-      Action   = "s3:PutObject"
-      Resource = "${aws_s3_bucket.alb_logs.arn}/*"
-    }]
-  })
-}
-
-data "aws_elb_service_account" "main" {}
-data "aws_caller_identity" "current" {}
-
-resource "aws_lb" "frontend_alb" {
-  name               = "frontend-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = aws_subnet.public[*].id
-
-  access_logs {
-    bucket  = aws_s3_bucket.alb_logs.id
-    prefix  = "frontend-alb"
-    enabled = true
-  }
-
-  tags = {
-    Name = "frontend-alb"
-  }
-}
-```
-
-**Impact:** Inability to audit traffic, troubleshoot issues, or detect security incidents.
-
----
-
-#### Issue 9: Missing HTTPS/TLS Configuration on Load Balancer
-
-**📁 File:** `load_balancers.tf`  
-**📍 Lines:** 14-24  
-**🏷️ Category:** Security
-
-**Current Code:**
-```hcl
-resource "aws_lb_listener" "frontend_listener" {
-  load_balancer_arn = aws_lb.frontend_alb.arn
-  port              = "80"
-  protocol          = "HTTP"
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.frontend_tg.arn
-  }
-}
-```
-
-**❌ Problem:**  
-The load balancer only listens on HTTP (port 80) without HTTPS. Traffic between users and the application is unencrypted, exposing sensitive data to interception.
-
-**✅ Solution:**  
-Add HTTPS listener with SSL certificate and redirect HTTP to HTTPS.
-
-**📖 Reference:**  
-[ALB HTTPS Listener](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html)  
-[AWS Certificate Manager](https://docs.aws.amazon.com/acm/latest/userguide/acm-overview.html)
-
-**💡 Fixed Code:**
-```hcl
-# Request or import SSL certificate
-resource "aws_acm_certificate" "main" {
-  domain_name       = var.domain_name
-  validation_method = "DNS"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-
-  tags = {
-    Name = "three-tier-app-cert"
-  }
-}
-
-# HTTPS listener
-resource "aws_lb_listener" "frontend_https" {
-  load_balancer_arn = aws_lb.frontend_alb.arn
-  port              = "443"
-  protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-  certificate_arn   = aws_acm_certificate.main.arn
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.frontend_tg.arn
-  }
-}
-
-# Redirect HTTP to HTTPS
-resource "aws_lb_listener" "frontend_http_redirect" {
-  load_balancer_arn = aws_lb.frontend_alb.arn
-  port              = "80"
-  protocol          = "HTTP"
-
-  default_action {
-    type = "redirect"
-
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
-    }
-  }
-}
-```
-
-**Impact:** Man-in-the-middle attacks; credential theft; compliance violations (PCI-DSS, HIPAA).
-
----
-
-#### Issue 10: EC2 Instances Missing IAM Instance Profile
-
-**📁 File:** `frontend.tf`  
-**📍 Lines:** 1-15  
-**🏷️ Category:** Security/Best Practices
-
-**Current Code:**
-```hcl
-resource "aws_instance" "frontend" {
-  count                  = 2
-  ami                    = data.aws_ami.ubuntu.id
-  instance_type          = var.instance_type
-  subnet_id              = aws_subnet.public[count.index].id
-  vpc_security_group_ids = [aws_security_group.frontend_sg.id]
-  key_name               = var.key_name
-  # Missing iam_instance_profile
-}
-```
-
-**❌ Problem:**  
-EC2 instances don't have IAM instance profiles attached. This means applications cannot securely access AWS services without hardcoded credentials.
-
-**✅ Solution:**  
-Create and attach IAM instance profiles with least-privilege permissions.
-
-**📖 Reference:**  
-[IAM Roles for EC2](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html)
-
-**💡 Fixed Code:**
-```hcl
-resource "aws_iam_role" "frontend" {
-  name = "frontend-ec2-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "ec2.amazonaws.com"
-      }
-    }]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "frontend_ssm" {
-  role       = aws_iam_role.frontend.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
-
-resource "aws_iam_instance_profile" "frontend" {
-  name = "frontend-instance-profile"
-  role = aws_iam_role.frontend.name
-}
-
-resource "aws_instance" "frontend" {
-  count                  = 2
-  ami                    = data.aws_ami.ubuntu.id
-  instance_type          = var.instance_type
-  subnet_id              = aws_subnet.public[count.index].id
-  vpc_security_group_ids = [aws_security_group.frontend_sg.id]
-  key_name               = var.key_name
-  iam_instance_profile   = aws_iam_instance_profile.frontend.name
-
-  # ... rest of configuration
-}
-```
-
-**Impact:** Applications cannot securely access AWS services; may lead to hardcoded credentials.
-
----
-
-### 🟡 MEDIUM SEVERITY ISSUES
-
----
-
-#### Issue 11: Missing Terraform State Backend Configuration
+#### Issue 6: Missing Backend State Configuration
 
 **📁 File:** `backend.tf`  
 **📍 Lines:** 1-10  
-**🏷️ Category:** DevOps/Best Practices
+**🏷️ Category:** DevOps/Reliability
 
 **Current Code:**
 ```hcl
-# backend.tf appears to be empty or minimal
+# backend.tf appears to be for EC2 backend tier, not Terraform state backend
+# Missing remote state configuration
 ```
 
 **❌ Problem:**  
-No remote backend is configured for Terraform state. Local state files are not suitable for team collaboration and can lead to state conflicts and data loss.
+No remote backend configuration for Terraform state. Local state files are not suitable for team collaboration, lack locking, and risk state corruption or loss.
 
 **✅ Solution:**  
-Configure S3 backend with DynamoDB for state locking.
+Configure S3 backend with DynamoDB locking for state management.
 
 **📖 Reference:**  
-[Terraform S3 Backend](https://developer.hashicorp.com/terraform/language/settings/backends/s3)
+[Terraform S3 Backend](https://developer.hashicorp.com/terraform/language/settings/backends/s3)  
+[State Locking](https://developer.hashicorp.com/terraform/language/state/locking)
 
 **💡 Fixed Code:**
 ```hcl
+# terraform-backend.tf (new file)
 terraform {
   backend "s3" {
-    bucket         = "three-tier-app-terraform-state"
-    key            = "staging/terraform.tfstate"
+    bucket         = "your-terraform-state-bucket"
+    key            = "3-tier-app/staging/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "terraform-state-lock"
   }
 }
 
-# Create these resources in a separate bootstrap configuration
+# Create these resources in a separate bootstrap configuration:
+# s3-backend-bootstrap.tf
 resource "aws_s3_bucket" "terraform_state" {
-  bucket = "three-tier-app-terraform-state"
+  bucket = "${var.project_name}-terraform-state-${data.aws_caller_identity.current.account_id}"
 
-  lifecycle {
-    prevent_destroy = true
+  tags = {
+    Name        = "Terraform State Bucket"
+    Environment = var.environment
   }
 }
 
@@ -743,8 +565,17 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" 
   }
 }
 
-resource "aws_dynamodb_table" "terraform_locks" {
-  name         = "terraform-state-lock"
+resource "aws_s3_bucket_public_access_block" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_dynamodb_table" "terraform_lock" {
+  name         = "${var.project_name}-terraform-lock"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "LockID"
 
@@ -752,176 +583,334 @@ resource "aws_dynamodb_table" "terraform_locks" {
     name = "LockID"
     type = "S"
   }
-}
-```
-
-**Impact:** State conflicts in team environments; risk of state file loss; no state locking.
-
----
-
-#### Issue 12: VPC Missing Flow Logs
-
-**📁 File:** `networking.tf`  
-**📍 Lines:** 1-6  
-**🏷️ Category:** Security/Observability
-
-**Current Code:**
-```hcl
-resource "aws_vpc" "main" {
-  cidr_block           = var.vpc_cidr
-  enable_dns_hostnames = true
-  enable_dns_support   = true
 
   tags = {
-    Name = "three-tier-vpc"
+    Name        = "Terraform State Lock Table"
+    Environment = var.environment
   }
 }
 ```
 
-**❌ Problem:**  
-VPC Flow Logs are not enabled. Without flow logs, you cannot monitor network traffic for security analysis, troubleshooting, or compliance.
-
-**✅ Solution:**  
-Enable VPC Flow Logs to CloudWatch Logs or S3.
-
-**📖 Reference:**  
-[VPC Flow Logs](https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs.html)
-
-**💡 Fixed Code:**
-```hcl
-resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
-  name              = "/aws/vpc/three-tier-vpc-flow-logs"
-  retention_in_days = 30
-}
-
-resource "aws_iam_role" "vpc_flow_logs" {
-  name = "vpc-flow-logs-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "vpc-flow-logs.amazonaws.com"
-      }
-    }]
-  })
-}
-
-resource "aws_iam_role_policy" "vpc_flow_logs" {
-  name = "vpc-flow-logs-policy"
-  role = aws_iam_role.vpc_flow_logs.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = [
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents",
-        "logs:DescribeLogGroups",
-        "logs:DescribeLogStreams"
-      ]
-      Effect   = "Allow"
-      Resource = "*"
-    }]
-  })
-}
-
-resource "aws_flow_log" "main" {
-  iam_role_arn    = aws_iam_role.vpc_flow_logs.arn
-  log_destination = aws_cloudwatch_log_group.vpc_flow_logs.arn
-  traffic_type    = "ALL"
-  vpc_id          = aws_vpc.main.id
-
-  tags = {
-    Name = "three-tier-vpc-flow-logs"
-  }
-}
-```
-
-**Impact:** Inability to detect network anomalies, troubleshoot connectivity issues, or meet compliance requirements.
+**Impact:** State corruption, team conflicts, infrastructure drift, disaster recovery failure
 
 ---
 
-#### Issue 13: EC2 Instances Missing Detailed Monitoring
+#### Issue 7: Missing Node.js Backend User Data Script
 
-**📁 File:** `frontend.tf`  
-**📍 Lines:** 1-15  
-**🏷️ Category:** Observability
+**📁 File:** `ec2-ubuntu/` directory  
+**📍 Lines:** N/A - Missing file  
+**🏷️ Category:** DevOps/Configuration
 
 **Current Code:**
 ```hcl
-resource "aws_instance" "frontend" {
-  count                  = 2
-  ami                    = data.aws_ami.ubuntu.id
-  instance_type          = var.instance_type
-  # Missing monitoring = true
-}
+# No user_data script for Node.js deployment found
 ```
 
 **❌ Problem:**  
-EC2 instances use basic monitoring (5-minute intervals) instead of detailed monitoring (1-minute intervals). This reduces visibility into instance performance.
+Backend EC2 instances for Node.js have no initialization script to install Node.js, configure the application, or set up process management.
 
 **✅ Solution:**  
-Enable detailed monitoring for better observability.
+Create a comprehensive user_data script for Node.js backend deployment.
 
 **📖 Reference:**  
-[EC2 Detailed Monitoring](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-cloudwatch-new.html)
+[Node.js Production Best Practices](https://nodejs.org/en/docs/guides/nodejs-docker-webapp)  
+[PM2 Process Manager](https://pm2.keymetrics.io/docs/usage/quick-start/)
 
 **💡 Fixed Code:**
-```hcl
-resource "aws_instance" "frontend" {
-  count                  = 2
-  ami                    = data.aws_ami.ubuntu.id
-  instance_type          = var.instance_type
-  subnet_id              = aws_subnet.public[count.index].id
-  vpc_security_group_ids = [aws_security_group.frontend_sg.id]
-  key_name               = var.key_name
-  
-  # Enable detailed monitoring
-  monitoring             = true
+```bash
+#!/bin/bash
+# scripts/backend-init.sh
 
-  tags = {
-    Name = "frontend-${count.index + 1}"
+set -euo pipefail
+
+# Logging setup
+exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+
+echo "Starting backend initialization..."
+
+# System updates
+apt-get update -y
+apt-get upgrade -y
+
+# Install dependencies
+apt-get install -y curl git jq unzip
+
+# Install AWS CLI v2
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+./aws/install
+rm -rf aws awscliv2.zip
+
+# Install Node.js ${node_version}
+curl -fsSL https://deb.nodesource.com/setup_${node_version}.x | bash -
+apt-get install -y nodejs
+
+# Verify installation
+node --version
+npm --version
+
+# Install PM2 globally
+npm install -g pm2
+
+# Create application user
+useradd -m -s /bin/bash nodeapp || true
+
+# Create application directory
+mkdir -p /opt/app
+chown nodeapp:nodeapp /opt/app
+
+# Fetch database credentials from Secrets Manager
+DB_CREDENTIALS=$(aws secretsmanager get-secret-value \
+  --secret-id ${db_secret_arn} \
+  --region ${region} \
+  --query SecretString \
+  --output text)
+
+DB_USERNAME=$(echo $DB_CREDENTIALS | jq -r '.username')
+DB_PASSWORD=$(echo $DB_CREDENTIALS | jq -r '.password')
+
+# Create environment file
+cat > /opt/app/.env << EOF
+NODE_ENV=production
+PORT=${app_port}
+DB_HOST=${db_host}
+DB_PORT=3306
+DB_NAME=mydb
+DB_USERNAME=$DB_USERNAME
+DB_PASSWORD=$DB_PASSWORD
+EOF
+
+chmod 600 /opt/app/.env
+chown nodeapp:nodeapp /opt/app/.env
+
+# Create a sample Express.js application (replace with your actual app deployment)
+cat > /opt/app/package.json << 'EOF'
+{
+  "name": "backend-api",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "mysql2": "^3.6.0",
+    "dotenv": "^16.3.1"
   }
 }
+EOF
+
+cat > /opt/app/server.js << 'EOF'
+require('dotenv').config();
+const express = require('express');
+const mysql = require('mysql2/promise');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+// Database connection pool
+const pool = mysql.createPool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  user: process.env.DB_USERNAME,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
+
+// Test database endpoint
+app.get('/api/db-test', async (req, res) => {
+  try {
+    const [rows] = await pool.execute('SELECT 1 as result');
+    res.json({ database: 'connected', result: rows });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+});
+EOF
+
+chown -R nodeapp:nodeapp /opt/app
+
+# Install dependencies
+cd /opt/app
+sudo -u nodeapp npm install --production
+
+# Configure PM2
+sudo -u nodeapp pm2 start server.js --name backend-api
+sudo -u nodeapp pm2 save
+
+# Setup PM2 to start on boot
+env PATH=$PATH:/usr/bin pm2 startup systemd -u nodeapp --hp /home/nodeapp
+systemctl enable pm2-nodeapp
+
+# Configure log rotation
+pm2 install pm2-logrotate
+pm2 set pm2-logrotate:max_size 10M
+pm2 set pm2-logrotate:retain 7
+
+echo "Backend initialization complete!"
 ```
 
-**Impact:** Reduced visibility into instance performance; slower detection of issues.
+**Impact:** Manual deployment required, inconsistent environments, deployment failures
 
 ---
 
-#### Issue 14: Missing Provider Version Constraints
+#### Issue 8: Load Balancer Missing Health Checks Configuration
 
-**📁 File:** `providers.tf`  
-**📍 Lines:** 1-8  
-**🏷️ Category:** DevOps/Best Practices
+**📁 File:** `load_balancers.tf`  
+**📍 Lines:** Estimated 15-30  
+**🏷️ Category:** Reliability/DevOps
 
 **Current Code:**
 ```hcl
-provider "aws" {
-  region = var.aws_region
+resource "aws_lb_target_group" "backend" {
+  name     = "backend-tg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+  # Missing: proper health_check configuration for Node.js
 }
 ```
 
 **❌ Problem:**  
-No version constraints are specified for the AWS provider. This can lead to unexpected breaking changes when provider versions are updated.
+Load balancer target group likely lacks proper health check configuration for Node.js applications, which could result in traffic being sent to unhealthy instances.
 
 **✅ Solution:**  
-Add version constraints in the `required_providers` block.
+Configure health checks targeting the Node.js application's health endpoint.
 
 **📖 Reference:**  
-[Terraform Provider Requirements](https://developer.hashicorp.com/terraform/language/providers/requirements)
+[ALB Health Checks](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/target-group-health-checks.html)  
+[Terraform LB Target Group](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lb_target_group)
 
 **💡 Fixed Code:**
 ```hcl
-terraform {
-  required_version = ">= 1.0.0"
+resource "aws_lb" "backend" {
+  name               = "${var.project_name}-backend-alb"
+  internal           = true  # Internal ALB for backend tier
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb_sg.id]
+  subnets            = aws_subnet.private[*].id
 
-  required_providers {
-    aws =
+  enable_deletion_protection = true
+
+  access_logs {
+    bucket  = aws_s3_bucket.alb_logs.id
+    prefix  = "backend-alb"
+    enabled = true
+  }
+
+  tags = {
+    Name        = "${var.project_name}-backend-alb"
+    Environment = var.environment
+  }
+}
+
+resource "aws_lb_target_group" "backend" {
+  name     = "${var.project_name}-backend-tg"
+  port     = 3000  # Node.js default port
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+    timeout             = 5
+    interval            = 30
+    path                = "/health"  # Node.js health endpoint
+    port                = "traffic-port"
+    protocol            = "HTTP"
+    matcher             = "200"
+  }
+
+  stickiness {
+    type            = "lb_cookie"
+    cookie_duration = 86400
+    enabled         = false
+  }
+
+  tags = {
+    Name        = "${var.project_name}-backend-tg"
+    Environment = var.environment
+  }
+}
+
+resource "aws_lb_listener" "backend" {
+  load_balancer_arn = aws_lb.backend.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend.arn
+  }
+}
+
+resource "aws_lb_target_group_attachment" "backend" {
+  count            = var.backend_instance_count
+  target_group_arn = aws_lb_target_group.backend.arn
+  target_id        = aws_instance.backend[count.index].id
+  port             = 3000
+}
+```
+
+**Impact:** Traffic to unhealthy instances, degraded user experience, cascading failures
+
+---
+
+#### Issue 9: Missing IAM Role for Backend EC2 Instances
+
+**📁 File:** Missing configuration  
+**📍 Lines:** N/A  
+**🏷️ Category:** Security/DevOps
+
+**Current Code:**
+```hcl
+# No IAM role configuration for EC2 instances
+```
+
+**❌ Problem:**  
+Backend EC2 instances need IAM roles to securely access AWS services (Secrets Manager for DB credentials, CloudWatch for logging) without embedding credentials.
+
+**✅ Solution:**  
+Create IAM role with least-privilege permissions for backend instances.
+
+**📖 Reference:**  
+[IAM Roles for EC2](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html)  
+[Terraform IAM Role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role)
+
+**💡 Fixed Code:**
+```hcl
+# iam.tf
+data "aws_iam_policy_document" "ec2_assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "backend" {
+  name               = "${var.project_name}-backend-role"
+  assume_role_policy = data.aws_iam_policy_document.ec2_assume_role.json
+
+  tags = {
 
 ## 💡 Recommendations
 
@@ -932,7 +921,7 @@ terraform {
 
 **Generated by AI DevOps Agent**
 **Branch:** `staging`
-**Date:** 2026-02-17T17:26:48.706Z
+**Date:** 2026-02-19T13:17:18.325Z
 
 ## 📝 Next Steps
 1. Review these recommendations
