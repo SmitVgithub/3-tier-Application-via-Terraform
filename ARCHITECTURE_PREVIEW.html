@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrackFleet - UI Mockups</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --bg-secondary: #12121a;
+            --text: #ffffff;
+            --text-secondary: #a0a0b0;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --accent: #00d4aa;
+            --accent-secondary: #7c3aed;
+            --accent-tertiary: #f59e0b;
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --shadow-color: rgba(0, 212, 170, 0.3);
+        }
+
+        [data-theme="light"] {
+            --bg: #f5f7fa;
+            --bg-secondary: #ffffff;
+            --text: #1a1a2e;
+            --text-secondary: #64648c;
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --card-border: rgba(0, 0, 0, 0.1);
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --shadow-color: rgba(0, 212, 170, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Sora', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+            transition: background 0.5s ease, color 0.5s ease;
+        }
+
+        /* Mesh Gradient Background */
+        .mesh-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: 
+                radial-gradient(ellipse at 20% 20%, rgba(0, 212, 170, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 80%, rgba(245, 158, 11, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 90% 90%, rgba(0, 212, 170, 0.1) 0%, transparent 40%),
+                var(--bg);
+        }
+
+        /* Floating Elements */
+        .floating-element {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(60px);
+            opacity: 0.4;
+            animation: float 8s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        .float-1 {
+            width: 400px;
+            height: 400px;
+            background: var(--accent);
+            top: -100px;
+            left: -100px;
+            animation-delay: 0s;
+        }
+
+        .float-2 {
+            width: 300px;
+            height: 300px;
+            background: var(--accent-secondary);
+            bottom: -50px;
+            right: -50px;
+            animation-delay: -3s;
+        }
+
+        .float-3 {
+            width: 200px;
+            height: 200px;
+            background: var(--accent-tertiary);
+            top: 50%;
+            right: 20%;
+            animation-delay: -5s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            25% { transform: translate(20px, -30px) rotate(5deg); }
+            50% { transform: translate(-10px, 20px) rotate(-5deg); }
+            75% { transform: translate(30px, 10px) rotate(3deg); }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        @keyframes borderGlow {
+            0%, 100% { border-color: var(--accent); box-shadow: 0 0 20px var(--shadow-color); }
+            50% { border-color: var(--accent-secondary); box-shadow: 0 0 30px rgba(124, 58, 237, 0.3); }
+        }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 1.5rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(20px);
+            background: var(--glass-bg);
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+            font-size: 1.5rem;
+        }
+
+        .logo-icon {
+            width: 45px;
+            height: 45px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .theme-toggle {
+            padding: 12px 24px;
+            border: 2px solid var(--card-border);
+            border-radius: 50px;
+            background: var(--glass-bg);
+            color: var(--text);
+            font-family: 'Sora', sans-serif;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px var(--shadow-color);
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 180px 3rem 80px;
+            text-align: center;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--accent), var(--accent-secondary), var(--accent-tertiary), var(--accent));
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientShift 5s ease infinite;
+        }
+
+        .hero p {
+            font-size: clamp(1rem, 2vw, 1.25rem);
+            color: var(--text-secondary);
+            font-weight: 300;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+
+        /* Mockups Grid */
+        .mockups-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 3rem;
+            padding: 2rem 3rem 6rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 1024px) {
+            .mockups-grid {
+                grid-template-columns: 1fr;
+                padding: 2rem 1.5rem 4rem;
+            }
+        }
+
+        /* Mockup Card */
+        .mockup-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 2rem;
+            opacity: 0;
+            transform: translateY(40px);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .mockup-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .mockup-card:hover {
+            transform: translateY(-12px) scale(1.02);
+            border-color: var(--accent);
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.4),
+                0 0 40px var(--shadow-color);
+        }
+
+        .mockup-card.featured {
+            grid-column: span 2;
+            background: linear-gradient(var(--glass-bg), var(--glass-bg)) padding-box,
+                        linear-gradient(135deg, var(--accent), var(--accent-secondary)) border-box;
+            border: 2px solid transparent;
+            animation: borderGlow 4s ease-in-out infinite;
+        }
+
+        @media (max-width: 1024px) {
+            .mockup-card.featured {
+                grid-column: span 1;
+            }
+        }
+
+        .mockup-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .mockup-desc {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 300;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Device Frames */
+        .device-frame {
+            position: relative;
+            margin: 0 auto;
+        }
+
+        .phone-frame {
+            width: 280px;
+            height: 580px;
+            background: #1a1a2e;
+            border-radius: 40px;
+            padding: 12px;
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                inset 0 0 0 2px rgba(255, 255, 255, 0.1);
+        }
+
+        .tablet-frame {
+            width: 100%;
+            max-width: 700px;
+            height: 500px;
+            background: #1a1a2e;
+            border-radius: 24px;
+            padding: 16px;
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                inset 0 0 0 2px rgba(255, 255, 255, 0.1);
+        }
+
+        .laptop-frame {
+            width: 100%;
+            max-width: 800px;
+            background: #1a1a2e;
+            border-radius: 16px 16px 0 0;
+            padding: 12px 12px 0;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .laptop-base {
+            width: 110%;
+            height: 20px;
+            background: linear-gradient(180deg, #2a2a3e, #1a1a2e);
+            border-radius: 0 0 12px 12px;
+            margin-left: -5%;
+            margin-top: 0;
+        }
+
+        .screen {
+            width: 100%;
+            height: 100%;
+            background: #0f0f1a;
+            border-radius: 28px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .tablet-frame .screen {
+            border-radius: 12px;
+        }
+
+        .laptop-frame .screen {
+            border-radius: 8px 8px 0 0;
+            height: 400px;
+        }
+
+        /* Screen Components */
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .status-bar-icons {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .notch {
+            width: 100px;
+            height: 28px;
+            background: #000;
+            border-radius: 0 0 20px 20px;
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .screen-content {
+            padding: 16px;
+            height: calc(100% - 44px);
+            overflow: hidden;
+        }
+
+        /* App UI Components */
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .app-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .app-subtitle {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+
+        .avatar-sm {
+            width: 32px;
+            height: 32px;
+            font-size: 0.8rem;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 12px;
+            border: none;
+            font-family: 'Sora', sans-serif;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #00b894);
+            color: #000;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text);
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.75rem;
+            border-radius: 8px;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: var(--text);
+            font-family: 'Sora', sans-serif;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+        }
+
+        .card-inner {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 50px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .status-online {
+            background: rgba(0, 212, 170, 0.2);
+            color: var(--accent);
+        }
+
+        .status-warning {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--accent-tertiary);
+        }
+
+        .status-offline {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .map-placeholder {
+            width: 100%;
+            height: 180px;
+            background: linear-gradient(135deg, #1a2a3a, #0f1a2a);
+            border-radius: 16px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .map-grid {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(0, 212, 170, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 170, 0.1) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        .map-route {
+            position: absolute;
+            top: 30%;
+            left: 10%;
+            width: 80%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-secondary));
+            border-radius: 2px;
+            transform: rotate(-5deg);
+        }
+
+        .map-marker {
+            position: absolute;
+            font-size: 1.5rem;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+        }
+
+        .marker-1 { top: 25%; left: 8%; }
+        .marker-2 { top: 28%; left: 85%; }
+        .marker-3 { top: 60%; left: 45%; }
+
+        .driver-list-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            margin-bottom: 8px;
+        }
+
+        .driver-info {
+            flex: 1;
+        }
+
+        .driver-name {
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .driver-meta {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .nav-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-around;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+        }
+
+        .nav-item.active {
+            color: var(--accent);
+        }
+
+        .nav-icon {
+            font-size: 1.25rem;
+        }
+
+        .shimmer-loading {
+            background: linear-gradient(90deg, 
+                rgba(255, 255, 255, 0.05) 25%, 
+                rgba(255, 255, 255, 0.1) 50%, 
+                rgba(255, 255, 255, 0.05) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent-secondary));
+            border-radius: 3px;
+        }
+
+        .invoice-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .invoice-amount {
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .toggle-switch {
+            width: 44px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            position: relative;
+        }
+
+        .toggle-switch.active {
+            background: var(--accent);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(20px);
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .setting-label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .web-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .web-nav {
+            display: flex;
+            gap: 24px;
+        }
+
+        .web-nav-item {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .web-nav-item.active {
+            color: var(--accent);
+        }
+
+        .sidebar {
+            width: 60px;
+            background: rgba(0, 0, 0, 0.3);
+            height: 100%;
+            position: absolute;
+            left: 0;
+            top: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 60px;
+            gap: 20px;
+        }
+
+        .sidebar-icon {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-icon:hover, .sidebar-icon.active {
+            background: var(--accent);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            border-top: 1px solid var(--card-border);
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+        }
+
+        footer span {
+            background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            header {
+                padding: 1rem 1.5rem;
+            }
+
+            .hero {
+                padding: 140px 1.5rem 60px;
+            }
+
+            .logo {
+                font-size: 1.2rem;
+            }
+
+            .phone-frame {
+                width: 260px;
+                height: 540px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="mesh-bg"></div>
+    <div class="floating-element float-1"></div>
+    <div class="floating-element float-2"></div>
+    <div class="floating-element float-3"></div>
+
+    <header>
+        <div class="logo">
+            <div class="logo-icon">🚛</div>
+            TrackFleet
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()">
+            <span id="theme-icon">🌙</span> Dark Mode
+        </button>
+    </header>
+
+    <section class="hero">
+        <h1>TrackFleet UI Mockups</h1>
+        <p>Real-time fleet management system with web dashboard for dispatchers, Android driver app, and iPad warehouse manager interface. Powered by Mapbox, Twilio & Stripe.</p>
+    </section>
+
+    <main class="mockups-grid">
+        <!-- Screen 1: Login -->
+        <div class="mockup-card">
+            <h3 class="mockup-title">🔐 Driver Login</h3>
+            <p class="mockup-desc">Secure authentication for 500+ drivers with offline capability</p>
+            <div class="device-frame phone-frame" style="margin: 0 auto;">
+                <div class="screen">
+                    <div class="notch"></div>
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div class="status-bar-icons">
+                            <span>📶</span>
+                            <span>🔋</span>
+                        </div>
+                    </div>
+                    <div class="screen-content" style="display: flex; flex-direction: column; justify-content: center; padding: 24px;">
+                        <div style="text-align: center; margin-bottom: 40px;">
+                            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--accent), var(--accent-secondary)); border-radius: 24px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem;">🚛</div>
+                            <h2 style="font-size: 1.5rem; font-weight: 700;">TrackFleet</h2>
+                            <p style="color: var(--text-secondary); font-size: 0.8rem;">Driver Portal</p>
+                        </div>
+                        <div class="input-field" style="display: flex; align-items: center; gap: 10px;">
+                            <span>👤</span>
+                            <span style="color: var(--text-secondary);">Driver ID or Email</span>
+                        </div>
+                        <div class="input-field" style="display: flex; align-items: center; gap: 10px;">
+                            <span>🔒</span>
+                            <span style="color: var(--text-secondary);">Password</span>
+                        </div>
+                        <button class="btn btn-primary" style="width: 100%; margin-top: 12px;">Sign In</button>
+                        <div style="text-align: center; margin-top: 20px;">
+                            <span style="color: var(--text-secondary); font-size: 0.8rem;">Forgot password?</span>
+                        </div>
+                        <div style="margin-top: 30px; padding: 16px; background: rgba(0, 212, 170, 0.1); border-radius: 12px; text-align: center;">
+                            <span style="font-size: 0.75rem; color: var(--accent);">📡 Offline mode available</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Screen 2: Dispatcher Dashboard (Featured) -->
+        <div class="mockup-card featured">
+            <h3 class="mockup-title">🖥️ Dispatcher Dashboard</h3>
+            <p class="mockup-desc">Real-time fleet overview with Mapbox integration for 50 dispatchers</p>
+            <div class="device-frame laptop-frame" style="margin: 0 auto;">
+                <div class="screen">
+                    <div class="web-header">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span style="font-size: 1.25rem;">🚛</span>
+                            <span style="font-weight: 700;">TrackFleet</span>
+                        </div>
+                        <div class="web-nav">
+                            <span class="web-nav-item active">Dashboard</span>
+                            <span class="web-nav-item">Drivers</span>
+                            <span class="web-nav-item">Routes</span>
+                            <span class="web-nav-item">Alerts</span>
+                            <span class="web-nav-item">Reports</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span style="position: relative;">🔔<span style="position: absolute; top: -4px; right: -4px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; animation: pulse 2s infinite;"></span></span>
+                            <div class="avatar avatar-sm">JD</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; height: calc(100% - 50px);">
+                        <div class="sidebar">
+                            <div class="sidebar-icon active">📊</div>
+                            <div class="sidebar-icon">🗺️</div>
+                            <div class="sidebar-icon">👥</div>
+                            <div class="sidebar-icon">📦</div>
+                            <div class="sidebar-icon">⚙️</div>
+                        </div>
+                        <div style="flex: 1; padding: 20px; margin-left: 60px; overflow: hidden;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <div>
+                                    <h2 style="font-size: 1.25rem; font-weight: 700;">Fleet Overview</h2>
+                                    <p style="font-size: 0.75rem; color: var(--text-secondary);">Real-time tracking • Last updated: 2 sec ago</p>
+                                </div>
+                                <div style="display: flex; gap: 10px;">
+                                    <button class="btn btn-secondary btn-sm">📤 Export</button>
+                                    <button class="btn btn-primary btn-sm">+ Dispatch</button>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;">
+                                <div class="stat-card">
+                                    <div class="stat-value">487</div>
+                                    <div class="stat-label">Active Drivers</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" style="background: linear-gradient(135deg, #f59e0b, #ef4444); -webkit-background-clip: text;">23</div>
+                                    <div class="stat-label">Delayed Routes</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">1,247</div>
+                                    <div class="stat-label">Deliveries Today</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">94.2%</div>
+                                    <div class="stat-label">On-Time Rate</div>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
+                                <div class="map-placeholder" style="height: 160px;">
+                                    <div class="map-grid"></div>
+                                    <div class="map-route"></div>
+                                    <div class="map-marker marker-1">📍</div>
+                                    <div class="map-marker marker-2">🏁</div>
+                                    <div class="map-marker marker-3">🚛</div>
+                                    <div style="position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 6px 10px; border-radius: 8px; font-size: 0.65rem;">
+                                        <span style="color: var(--accent);">●</span> 487 vehicles online
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 0.8rem; font-weight: 600; margin-bottom: 10px;">Recent Alerts</div>
+                                    <div style="background: rgba(239, 68, 68, 0.1); padding: 10px; border-radius: 10px; margin-bottom: 8px; font-size: 0.7rem;">
+                                        <span>⚠️</span> Driver #234 - Route delay
+                                    </div>
+                                    <div style="background: rgba(245, 158, 11, 0.1); padding: 10px; border-radius: 10px; margin-bottom: 8px; font-size: 0.7rem;">
+                                        <span>🔧</span> Vehicle #89 - Maintenance
+                                    </div>
+                                    <div style="background: rgba(0, 212, 170, 0.1); padding: 10px; border-radius: 10px; font-size: 0.7rem;">
+                                        <span>✅</span> Delivery #1247 complete
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="laptop-base"></div>
+            </div>
+        </div>
+
+        <!-- Screen 3: Driver App - Active Route -->
+        <div class="mockup-card">
+            <h3 class="mockup-title">📱 Driver Active Route</h3>
+            <p class="mockup-desc">Turn-by-turn navigation with offline GPS tracking</p>
+            <div class="device-frame phone-frame" style="margin: 0 auto;">
+                <div class="screen">
+                    <div class="notch"></div>
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div class="status-bar-icons">
+                            <span style="color: var(--accent);">📡</span>
+                            <span>🔋</span>
+                        </div>
+                    </div>
+                    <div class="screen-content" style="padding: 0;">
+                        <div class="map-placeholder" style="height: 280px; border-radius: 0; margin: 0;">
+                            <div class="map-grid"></div>
+                            <div class="map-route" style="top: 40%; transform: rotate(15deg);"></div>
+                            <div class="map-marker" style="top: 35%; left: 20%;">📍</div>
+                            <div class="map-marker" style="top: 45%; left: 70%;">🏁</div>
+                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2rem;">🚛</div>
+                            <div style="position: absolute; top: 16px; left: 16px; right: 16px; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); padding: 12px 16px; border-radius: 12px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <div style="font-size: 0.7rem; color: var(--text-secondary);">Next Stop</div>
+                                        <div style="font-weight: 600;">Warehouse B - Dock 4</div>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <div style="font-size: 1.25rem; font-weight: 700; color: var(--accent);">12 min</div>
+                                        <div style="font-size: 0.7rem; color: var(--text-secondary);">4.2 mi</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="padding: 16px;">
+                            <div class="card-inner" style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary);">Current Delivery</div>
+                                    <div style="font-weight: 600;">Order #TF-2847</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-secondary);">15 packages • 340 lbs</div>
+                                </div>
+                                <span class="status-badge status-online"><span class="pulse-dot"></span>On Route</span>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px;">
+                                <button class="btn btn-secondary btn-sm" style="display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px;">
+                                    <span>📞</span>
+                                    <span style="font-size: 0.65rem;">Dispatch</span>
+                                </button>
+                                <button class="btn btn-secondary btn-sm" style="display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px;">
+                                    <span>⚠️</span>
+                                    <span style="font-size: 0.65rem;">Report</span>
+                                </button>
+                                <button class="btn btn-primary btn-sm" style="display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px;">
+                                    <span>✅</span>
+                                    <span style="font-size: 0.65rem;">Arrived</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="nav-bar">
+                        <div class="nav-item"><span class="nav-icon">🏠</span>Home</div>
+                        <div class="nav-item active"><span class="nav-icon">🗺️</span>Route</div>
+                        <div class="nav-item"><span class="nav-icon">📦</span>Deliveries</div>
+                        <div class="nav-item"><span class="nav-icon">👤</span>Profile</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Screen 4: iPad Warehouse Manager -->
+        <div class="mockup-card">
+            <h3 class="mockup-title">📊 Warehouse Manager (iPad)</h3>
+            <p class="mockup-desc">Inventory and dock management for 10 warehouse locations</p>
+            <div class="device-frame tablet-frame" style="margin: 0 auto;">
+                <div class="screen">
+                    <div class="web-header" style="padding: 10px 16px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.1rem;">🚛</span>
+                            <span style="font-weight: 600; font-size: 0.9rem;">TrackFleet Warehouse</span>
+                        </div>
+                        <span class="status-badge status-online"><span class="pulse-dot"></span>Warehouse A - Chicago</span>
+                        <div class="avatar avatar-sm">MK</div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px; height: calc(100% - 50px);">
+                        <div>
+                            <div style="font-weight: 600; margin-bottom: 12px; font-size: 0.9rem;">📦 Dock Status</div>
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                                <div class="card-inner" style="text-align: center; padding: 12px;">
+                                    <div style="font-size: 1.5rem; margin-bottom: 4px;">🟢</div>
+                                    <div style="font-weight: 600; font-size: 0.8rem;">Dock 1</div>
+                                    <div style="font-size: 0.65rem; color: var(--text-secondary);">Available</div>
+                                </div>
+                                <div class="card-inner" style="text-align: center; padding: 12px; border-color: var(--accent-tertiary);">
+                                    <div style="font-size: 1.5rem; margin-bottom: 4px;">🚛</div>
+                                    <div style="font-weight: 600; font-size: 0.8rem;">Dock 2</div>
+                                    <div style="font-size: 0.65rem; color: var(--accent-tertiary);">Loading</div>
+                                </div>
+                                <div class="card-inner" style="text-align: center; padding: 12px; border-color: var(--accent);">
+                                    <div style="font-size: 1.5rem; margin-bottom: 4px;">🚛</div>
+                                    <div style="font-weight: 600; font-size: 0.8rem;">Dock 3</div>
+                                    <div style="font-size: 0.65rem; color: var(--accent);">Unloading</div>
+                                </div>
+                                <div class="card-inner" style="text-align: center; padding: 12px;">
+                                    <div style="font-size: 1.5rem; margin-bottom: 4px;">🟢</div>
+                                    <div style="font-weight: 600; font-size: 0.8rem;">Dock 4</div>
+                                    <div style="font-size: 0.65rem; color: var(--text-secondary);">Available</div>
+                                </div>
+                            </div>
+                            <div style="font-weight: 600; margin: 16px 0 12px; font-size: 0.9rem;">📈 Today's Stats</div>
+                            <div class="stats-grid">
+                                <div class="stat-card" style="padding: 12px;">
+                                    <div class="stat-value" style="font-size: 1.25rem;">147</div>
+                                    <div class="stat-label">Inbound</div>
+                                </div>
+                                <div class="stat-card" style="padding: 12px;">
+                                    <div class="stat-value" style="font-size: 1.25rem;">203</div>
+                                    <div class="stat-label">Outbound</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; margin-bottom: 12px; font-size: 0.9rem;">🚚 Incoming Vehicles</div>
+                            <div class="driver-list-item">
+                                <div class="avatar avatar-sm">🚛</div>
+                                <div class="driver-info">
+                                    <div class="driver-name">Vehicle #TF-234</div>
+                                    <div class="driver-meta">Driver: Mike Johnson • ETA: 8 min</div>
+                                </div>
+                                <span class="status-badge status-warning">Arriving</span>
+                            </div>
+                            <div class="driver-list-item">
+                                <div class="avatar avatar-sm">🚛</div>
+                                <div class="driver-info">
+                                    <div class="driver-name">Vehicle #TF-189</div>
+                                    <div class="driver-meta">Driver: Sarah Chen • ETA: 23 min</div>
+                                </div>
+                                <span class="status-badge status-online">On Route</span>
+                            </div>
+                            <div class="driver-list-item">
+                                <div class="avatar avatar-sm">🚛</div>
+                                <div class="driver-info">
+                                    <div class="driver-name">Vehicle #TF-412</div>
+                                    <div class="driver-meta">Driver: Tom Wilson • ETA: 45 min</div>
+                                </div>
+                                <span class="status-badge status-online">On Route</span>
+                            </div>
+                            <div style="margin-top: 16px;">
+                                <div style="font-weight: 600; margin-bottom: 8px; font-size: 0.9rem;">📊 Capacity</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Storage: 78% utilized</div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 78%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Screen 5: SMS Alerts & Notifications -->
+        <div class="mockup-card">
+            <h3 class="mockup-title">📲 Twilio SMS Alerts</h3>
+            <p class="mockup-desc">Real-time notifications for drivers, dispatchers & customers</p>
+            <div class="device-frame phone-frame" style="margin: 0 auto;">
+                <div class="screen">
+                    <div class="notch"></div>
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div class="status-bar-icons">
+                            <span>📶</span>
+                            <span>🔋</span>
+                        </div>
+                    </div>
+                    <div class="screen-content">
+                        <div class="app-header">
+                            <div>
+                                <div class="app-title">Notifications</div>
+                                <div class="app-subtitle">3 new alerts</div>
+                            </div>
+                            <button class="btn btn-secondary btn-sm">Mark all read</button>
+                        </div>
+                        <div class="card-inner" style="border-left: 3px solid #ef4444;">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="display: flex; gap: 10px;">
+                                    <span style="font-size: 1.25rem;">🚨</span>
+                                    <div>
+                                        <div style="font-weight: 600; font-size: 0.85rem;">Route Delay Alert</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">Vehicle #TF-234 delayed 25 min due to traffic on I-90</div>
+                                        <div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 6px;">📱 SMS sent to customer</div>
+                                    </div>
+                                </div>
+                                <span style="font-size: 0.65rem; color: var(--text-secondary);">2m</span>
+                            </div>
+                        </div>
+                        <div class="card-inner" style="border-left: 3px solid var(--accent);">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="display: flex; gap: 10px;">
+                                    <span style="font-size: 1.25rem;">✅</span>
+                                    <div>
+                                        <div style="font-weight: 600; font-size: 0.85rem;">Delivery Confirmed</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">Order #TF-2841 delivered successfully</div>
+                                        <div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 6px;">📱 Confirmation sent</div>
+                                    </div>
+                                </div>
+                                <span style="font-size: 0.65rem; color: var(--text-secondary);">15m</span>
+                            </div>
+                        </div>
+                        <div class="card-inner" style="border-left: 3px solid var(--accent-tertiary);">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="display: flex; gap: 10px;">
+                                    <span style="font-size: 1.25rem;">🔧</span>
+                                    <div>
+                                        <div style="font-weight: 600; font-size: 0.85rem;">Maintenance Due</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">Vehicle #TF-089 scheduled for service tomorrow</div>
+                                        <div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 6px;">📱 Driver notified</div>
+                                    </div>
+                                </div>
+                                <span style="font-size: 0.65rem; color: var(--text-secondary);">1h</span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 20px; padding: 16px; background: rgba(124, 58, 237, 0.1); border-radius: 12px;">
+                            <div style="font-weight: 600; font-size: 0.85rem; margin-bottom: 8px;">📊 SMS Stats Today</div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem;">
+                                <span>Sent: <strong style="color: var(--accent);">1,247</strong></span>
+                                <span>Delivered: <strong style="color: var(--accent);">99.2%</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="nav-bar">
+                        <div class="nav-item"><span class="nav-icon">🏠</span>Home</div>
+                        <div class="nav-item"><span class="nav-icon">🗺️</span>Route</div>
+                        <div class="nav-item active"><span class="nav-icon">🔔</span>Alerts</div>
+                        <div class="nav-item"><span class="nav-icon">👤</span>Profile</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Screen 6: Stripe Invoice Payments -->
+        <div class="mockup-card">
+            <h3 class="mockup-title">💳 Stripe Invoice Payments</h3>
+            <p class="mockup-desc">Billing management and payment processing for clients</p>
+            <div class="device-frame phone-frame" style="margin: 0 auto;">
+                <div class="screen">
+                    <div class="notch"></div>
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div class="status-bar-icons">
+                            <span>📶</span>
+                            <span>🔋</span>
+                        </div>
+                    </div>
+                    <div class="screen-content">
+                        <div class="app-header">
+                            <div>
+                                <div class="app-title">Billing</div>
+                                <div class="app-subtitle">November 2024</div>
+                            </div>
+                            <button class="btn btn-primary btn-sm">+ New Invoice</button>
+                        </div>
+                        <div class="card-inner" style="background: linear-gradient(135deg, rgba(0, 212, 170, 0.2), rgba(124, 58, 237, 0.2));">
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.75rem; color: var(--text-secondary);">Total Outstanding</div>
+                                <div style="font-size: 2rem; font-weight: 700; margin: 8px 0;">$24,580</div>
+                                <div style="display: flex; justify-content: center; gap: 20px; font-size: 0.7rem;">
+                                    <span><span style="color: var(--accent);">●</span> Paid: $89,420</span>
+                                    <span><span style="color: var(--accent-tertiary);">●</span> Pending: $24,580</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="font-weight: 600; font-size: 0.85rem; margin: 16px 0 12px;">Recent Invoices</div>
+                        <div class="invoice-item">
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.85rem;">Acme Logistics</div>
+                                <div style="font-size: 0.7rem; color: var(--text-secondary);">INV-2024-0847 • Due Dec 1</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div class="invoice-amount">$8,450</div>
+                                <span class="status-badge status-warning" style="font-size: 0.6rem; padding: 4px 8px;">Pending</span>
+                            </div>
+                        </div>
+                        <div class="invoice-item">
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.85rem;">Global Shipping Co</div>
+                                <div style="font-size: 0.7rem; color: var(--text-secondary);">INV-2024-0846 • Nov 28</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div class="invoice-amount">$12,200</div>
+                                <span class="status-badge status-online" style="font-size: 0.6rem; padding: 4px 8px;">Paid</span>
+                            </div>
+                        </div>
+                        <div class="invoice-item" style="border: none;">
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.85rem;">FastFreight Inc</div>
+                                <div style="font-size: 0.7rem; color: var(--text-secondary);">INV-2024-0845 • Nov 25</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div class="invoice-amount">$5,780</div>
+                                <span class="status-badge status-online" style="font-size: 0.6rem; padding: 4px 8px;">Paid</span>
+                            </div>
+                        </div>
+                        <div class="shimmer-loading" style="height: 50px; margin-top: 12px;"></div>
+                    </div>
+                    <div class="nav-bar">
+                        <div class="nav-item"><span class="nav-icon">🏠</span>Home</div>
+                        <div class="nav-item active"><span class="nav-icon">💳</span>Billing</div>
+                        <div class="nav-item"><span class="nav-icon">📊</span>Reports</div>
+                        <div class="nav-item"><span class="nav-icon">⚙️</span>Settings</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Screen 7: Settings -->
+        <div class="mockup-card">
+            <h3 class="mockup-title">⚙️ Driver Settings</h3>
+            <p class="mockup-desc">Profile management, preferences, and offline sync settings</p>
+            <div class="device-frame phone-frame" style="margin: 0 auto;">
+                <div class="screen">
+                    <div class="notch"></div>
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <div class="status-bar-icons">
+                            <span>📶</span>
+                            <span>🔋</span>
+                        </div>
+                    </div>
+                    <div class="screen-content">
+                        <div class="app-header">
+                            <div class="app-title">Settings</div>
+                            <span style="font-size: 0.75rem; color: var(--text-secondary);">v2.4.1</span>
+                        </div>
+                        <div class="card-inner" style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+                            <div class="avatar" style="width: 60px; height: 60px; font-size: 1.5rem;">MJ</div>
+                            <div>
+                                <div style="font-weight: 600;">Mike Johnson</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary);">Driver ID: TF-234</div>
+                                <span class="status-badge status-online" style="margin-top: 6px;"><span class="pulse-dot"></span>On Duty</span>
+                            </div>
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Preferences</div>
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>📍</span>
+                                <span style="font-size: 0.85rem;">GPS Tracking</span>
+                            </div>
+                            <div class="toggle-switch active"></div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>📴</span>
+                                <span style="font-size: 0.85rem;">Offline Mode</span>
+                            </div>
+                            <div class="toggle-switch active"></div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>🔔</span>
+                                <span style="font-size: 0.85rem;">Push Notifications</span>
+                            </div>
+                            <div class="toggle-switch active"></div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>🌙</span>
+                                <span style="font-size: 0.85rem;">Dark Mode</span>
+                            </div>
+                            <div class="toggle-switch active"></div>
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin: 20px 0 8px; text-transform: uppercase; letter-spacing: 1px;">Data Sync</div>
+                        <div class="card-inner">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="font-size: 0.8rem;">Last synced</span>
+                                <span style="font-size: 0.8rem; color: var(--accent);">2 min ago</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 100%;"></div>
+                            </div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 8px;">Offline data: 24 MB cached</div>
+                        </div>
+                        <button class="btn btn-secondary" style="width: 100%; margin-top: 16px; color: #ef4444;">🚪 Sign Out</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>Generated by <span>Blueprint Brain</span> ✨</p>
+    </footer>
+
+    <script>
+        // Theme Toggle
+        function toggleTheme() {
+            const body = document.body;
+            const themeIcon = document.getElementById('theme-icon');
+            const themeBtn = document.querySelector('.theme-toggle');
+            
+            if (body.getAttribute('data-theme') === 'light') {
+                body.removeAttribute('data-theme');
+                themeIcon.textContent = '🌙';
+                themeBtn.innerHTML = '<span id="theme-icon">🌙</span> Dark Mode';
+            } else {
+                body.setAttribute('data-theme', 'light');
+                themeIcon.textContent = '☀️';
+                themeBtn.innerHTML = '<span id="theme-icon">☀️</span> Light Mode';
+            }
+        }
+
+        // Intersection Observer for scroll animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry, index) => {
+                if (entry.isIntersecting) {
+                    setTimeout(() => {
+                        entry.target.classList.add('visible');
+                    }, index * 100);
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.mockup-card').forEach(card => {
+            observer.observe(card);
+        });
+
+        // Add hover sound effect simulation with visual feedback
+        document.querySelectorAll('.mockup-card').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+            });
+        });
+
+        // Smooth scroll behavior
+        document.documentElement.style.scrollBehavior = 'smooth';
+
+        // Add parallax effect to floating elements
+        document.addEventListener('mousemove', (e) => {
+            const floats = document.querySelectorAll('.floating-element');
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+            
+            floats.forEach((float, index) => {
+                const speed = (index + 1) * 10;
+                float.style.transform = `translate(${x * speed}px, ${y * speed}px)`;
+            });
+        });
+    </script>
+</body>
+</html>
